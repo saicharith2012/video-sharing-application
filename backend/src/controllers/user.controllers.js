@@ -112,21 +112,27 @@ const loginUser = asyncHandler(async (req, res) => {
   // take the details from the client side
   const { email, username, password } = req.body;
 
-  if (!username || !email) {
+  if (!username && !email) {
     throw new ApiError(400, "username or email is required.");
   }
 
   // check if any field is empty
   if (
-    ([email, password] || [username, password]).some(
-      (field) => field.trim() === ""
-    )
+    username && [username, password].some((field) => field.trim() === "") ||
+    email && [email, password].some((field) => field.trim() === "")
   ) {
     throw new ApiError(400, "all fields are must");
   }
 
   // checking email and username format
-  if (!validator.isEmail(email) || !validator.isLowercase(username)) {
+  if (
+    !(email
+      ? validator.isEmail(email)
+      : false || 
+      username
+        ? validator.isLowercase(username)
+        : false)
+  ) {
     throw new ApiError(400, "email or username is invalid.");
   }
 
@@ -152,7 +158,7 @@ const loginUser = asyncHandler(async (req, res) => {
   );
 
   // send the tokens to the user in the form of secure cookies
-  const loggedInUser = User.findById(existingUser._id).select(
+  const loggedInUser = await User.findById(existingUser._id).select(
     "-password -refreshToken"
   );
 
@@ -206,7 +212,7 @@ const logoutUser = asyncHandler(async (req, res) => {
     .status(200)
     .clearCookie("accessToken", options)
     .clearCookie("refreshToken", options)
-    .json(new ApiResponse(200, {}, "user logged out successfully."))
+    .json(new ApiResponse(200, {}, "user logged out successfully."));
 });
 
 export { registerUser, loginUser, logoutUser };
