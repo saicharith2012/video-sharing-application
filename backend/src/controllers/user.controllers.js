@@ -274,4 +274,168 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+// changing user password
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+  // take old and new passwords from the user.
+  const { oldPassword, newPassword } = req.body;
+
+  // extract the user data from the database (added to req body by auth middleware)
+  const user = await User.findById(req.user?._id);
+
+  if (!user) {
+    throw new ApiError(400, "unauthorized request.");
+  }
+
+  // compare the passwords with user model method
+  if (!(await user.isPasswordCorrect(oldPassword))) {
+    throw new ApiError(401, "password incorrect.");
+  }
+
+  // update the password and save to the database
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+
+  // send response
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "password updated successfully."));
+});
+
+// get current user details
+const getCurrentUserData = asyncHandler(async (req, res) => {
+  // using the authMiddleware that attaches the current user data to the req.
+  // bring the data as response.
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        data: req.user,
+      },
+      "user data fetched successfully."
+    )
+  );
+});
+
+const updateUserDetails = asyncHandler(async (req, res) => {
+  const { fullName, email } = req.body;
+
+  if (!fullName || !email) {
+    throw new ApiError(401, "fullname and email are required.");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        fullName,
+        email,
+      },
+    },
+    { new: true }
+  ).select("-password -refreshToken");
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        user,
+      },
+      "user updated successfully."
+    )
+  );
+});
+
+const updateUserAvatar = asyncHandler(async (req, res) => {
+  // identify the user
+  // upload the new avatar to the server using multer middleware
+  const newAvatarLocalPath = req.file?.path;
+
+  if (!newAvatarLocalPath) {
+    throw new ApiError(400, "Avatar file is missing.");
+  }
+  // upload to the cloudinary
+  const newAvatar = await uploadOnCloudinary(newAvatarLocalPath);
+
+  if (!newAvatar) {
+    throw new ApiError(
+      400,
+      "Error while uploading a new avatar to cloudinary."
+    );
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        avatar: newAvatar.url,
+      },
+    },
+    {
+      new: true,
+    }
+  ).select("-password -refreshToken");
+
+  if (!user) {
+    throw new ApiError(401, "unauthorized request.");
+  }
+
+  // send response.
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        data: user,
+      },
+      "avatar successfully updated."
+    )
+  );
+});
+
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+  const newCoverImagePath = req.file?.path;
+
+  if (!newCoverImagePath) {
+    throw new ApiError(400, "cover image file missing.");
+  }
+
+  const newCoverImage = await uploadOnCloudinary(newCoverImagePath);
+
+  if (!newCoverImage) {
+    throw new ApiError(
+      400,
+      "Error while uploading the cover image to cloudinary."
+    );
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        coverImage: newCoverImage.url,
+      },
+    },
+    { new: true }
+  ).select("-password -refreshToken");
+
+  if (!user) {
+    throw new ApiError(400, "unauthorized request.");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, { data: user }, "cover image successfully updated.")
+    );
+});
+
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  refreshAccessToken,
+  changeCurrentPassword,
+  getCurrentUserData,
+  updateUserDetails,
+  updateUserAvatar,
+  updateUserCoverImage,
+};
