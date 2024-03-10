@@ -215,8 +215,15 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "user logged out successfully."));
 });
 
-// refreshing Access token using the refresh token
+// refreshing the expired Access token using the refresh token
 const refreshAccessToken = asyncHandler(async (req, res) => {
+  // extract the refresh token from the user cookies.
+  // decode
+  // find the user with id from the decoded token
+  // check if the token from the user and the token of the user from database matches,
+  // generate new token method
+  // send response
+
   const incomingRefreshToken =
     req.cookies?.refreshToken || req.body.refreshToken;
 
