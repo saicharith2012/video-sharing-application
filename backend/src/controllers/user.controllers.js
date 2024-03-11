@@ -2,7 +2,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import validator from "validator";
 import { User } from "../models/user.models.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { deleteOnCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt, { decode } from "jsonwebtoken";
 
@@ -86,7 +86,9 @@ const registerUser = asyncHandler(async (req, res) => {
   const user = await User.create({
     fullName,
     avatar: avatar.url,
+    avatarId: avatar.public_id,
     coverImage: coverImage?.url || "",
+    coverImageId: coverImage?.public_id || "",
     username: username.toLowerCase(),
     email,
     password,
@@ -94,7 +96,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   // remove password and refresh token from the response
   const createdUser = await User.findById(user._id).select(
-    "-password -refreshToken"
+    "-password -refreshToken -avatarId -coverImageId"
   );
 
   // check if the user is created
@@ -159,7 +161,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
   // send the tokens to the user in the form of secure cookies
   const loggedInUser = await User.findById(existingUser._id).select(
-    "-password -refreshToken"
+    "-password -refreshToken -avatarId -coverImageId"
   );
 
   const options = {
@@ -353,6 +355,20 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   if (!newAvatarLocalPath) {
     throw new ApiError(400, "Avatar file is missing.");
   }
+
+  // Delete the old avatar on cloudinary
+  const oldAvatarId = req.user?.avatarId;
+
+  if (!oldAvatarId) {
+    throw new ApiError(400, "unauthorized request.");
+  }
+
+  const response = await deleteOnCloudinary(oldAvatarId);
+
+  if (!response) {
+    throw new ApiError(400, "Error while deleting the current avatar");
+  }
+
   // upload to the cloudinary
   const newAvatar = await uploadOnCloudinary(newAvatarLocalPath);
 
@@ -368,12 +384,13 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     {
       $set: {
         avatar: newAvatar.url,
+        avatarId: newAvatar.public_id,
       },
     },
     {
       new: true,
     }
-  ).select("-password -refreshToken");
+  ).select("-password -refreshToken -avatarId -coverImageId");
 
   if (!user) {
     throw new ApiError(401, "unauthorized request.");
@@ -398,6 +415,21 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     throw new ApiError(400, "cover image file missing.");
   }
 
+  // Delete the old cover image on cloudinary
+  const oldCoverId = req.user?.coverImageId;
+
+  if (!oldCoverId) {
+    throw new ApiError(400, "unauthorized request.");
+  }
+
+  const response = await deleteOnCloudinary(oldCoverId);
+
+  if (!response) {
+    throw new ApiError(400, "Error while deleting the current cover image");
+  }
+
+  // uploading new cover on cloudinary
+
   const newCoverImage = await uploadOnCloudinary(newCoverImagePath);
 
   if (!newCoverImage) {
@@ -412,10 +444,11 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     {
       $set: {
         coverImage: newCoverImage.url,
+        coverImageId: newCoverImage.public_id
       },
     },
     { new: true }
-  ).select("-password -refreshToken");
+  ).select("-password -refreshToken -avatarId -coverImageId");
 
   if (!user) {
     throw new ApiError(400, "unauthorized request.");
