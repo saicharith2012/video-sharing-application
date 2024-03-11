@@ -356,19 +356,6 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Avatar file is missing.");
   }
 
-  // Delete the old avatar on cloudinary
-  const oldAvatarId = req.user?.avatarId;
-
-  if (!oldAvatarId) {
-    throw new ApiError(400, "unauthorized request.");
-  }
-
-  const response = await deleteOnCloudinary(oldAvatarId);
-
-  if (!response) {
-    throw new ApiError(400, "Error while deleting the current avatar");
-  }
-
   // upload to the cloudinary
   const newAvatar = await uploadOnCloudinary(newAvatarLocalPath);
 
@@ -396,6 +383,19 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     throw new ApiError(401, "unauthorized request.");
   }
 
+  // Delete the old avatar on cloudinary
+  const oldAvatarId = req.user?.avatarId;
+
+  if (!oldAvatarId) {
+    throw new ApiError(400, "unauthorized request.");
+  }
+
+  const response = await deleteOnCloudinary(oldAvatarId);
+
+  if (!response) {
+    throw new ApiError(400, "Error while deleting the current avatar");
+  }
+
   // send response.
   return res.status(200).json(
     new ApiResponse(
@@ -415,19 +415,6 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     throw new ApiError(400, "cover image file missing.");
   }
 
-  // Delete the old cover image on cloudinary
-  const oldCoverId = req.user?.coverImageId;
-
-  if (!oldCoverId) {
-    throw new ApiError(400, "unauthorized request.");
-  }
-
-  const response = await deleteOnCloudinary(oldCoverId);
-
-  if (!response) {
-    throw new ApiError(400, "Error while deleting the current cover image");
-  }
-
   // uploading new cover on cloudinary
 
   const newCoverImage = await uploadOnCloudinary(newCoverImagePath);
@@ -439,12 +426,14 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     );
   }
 
+  // updating the coverImage
+
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
       $set: {
         coverImage: newCoverImage.url,
-        coverImageId: newCoverImage.public_id
+        coverImageId: newCoverImage.public_id,
       },
     },
     { new: true }
@@ -452,6 +441,19 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
   if (!user) {
     throw new ApiError(400, "unauthorized request.");
+  }
+
+  // Delete the old cover image on cloudinary
+  const oldCoverId = req.user?.coverImageId;
+
+  if (!oldCoverId) {
+    throw new ApiError(400, "unauthorized request.");
+  }
+
+  const response = await deleteOnCloudinary(oldCoverId);
+
+  if (!response) {
+    throw new ApiError(400, "Error while deleting the current cover image");
   }
 
   return res
